@@ -1,0 +1,25 @@
+# Core
+streamlit
+python-dotenv
+
+# LangChain & components
+langchain
+langchain-community
+faiss-cpu          # CPU version of FAISS (use faiss-gpu if needed)
+
+# Embeddings
+openai
+
+# PDF parsing
+pypdf               # for PDF support
+pdfminer.six        # required by some loaders
+
+# Optional (for HuggingFace LLM)
+huggingface-hub
+
+# Sentence splitting
+tiktoken
+
+# Utilities
+sentence-transformers
+google.generativeai
