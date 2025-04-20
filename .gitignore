@@ -1,1 +1,5 @@
 .env
+/venv
+/docs
+/faiss_index
+/qa_history_index

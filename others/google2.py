@@ -6,7 +6,6 @@ import streamlit as st
 from dotenv import load_dotenv
 from PIL import Image
 from PyPDF2 import PdfReader
-import base64
 
 # Langchain
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -30,7 +29,7 @@ DOCS_FOLDER = "docs/"
 INDEX_PATH = "faiss_index"
 
 #UI
-st.set_page_config(page_title="UD Kaizen Helper", page_icon="🚛", layout="wide")
+st.set_page_config(page_title="UD-Trucks BOT", page_icon="🚛", layout="wide")
 
 # --- PDF PROCESSING  ---
 def get_documents():
@@ -67,7 +66,7 @@ vector_store = load_faiss_index()
 
 with st.sidebar:
     st.title("Settings")
-    select_model = st.selectbox("Select feature", ["UD Kaizen"])
+    select_model = st.selectbox("Select feature", ["UD-Trucks BOT"])
     st.markdown("### 📚 Knowledge Base Files")
     documents = get_documents()
     for i, doc in enumerate(documents, start=1):
@@ -129,7 +128,7 @@ def get_conversational_chain():
 
     # Prompt to support markdown formatting
     system_prompt = """
-    Anda adalah asisten cerdas bernama 'UD Kaizen Helper' yang ahli dalam menjawab pertanyaan terkait produk-produk UD Trucks.
+    Anda adalah asisten chatbot bernama 'UD-BOT' yang ahli dalam menjawab pertanyaan terkait produk-produk UD Trucks.
     Gunakan informasi dari brosur yang telah diberikan untuk memberikan jawaban yang akurat dan terperinci.
     Jika informasi tidak ditemukan dalam data, beri tahu pengguna bahwa informasi tidak tersedia.
 
@@ -163,7 +162,7 @@ def get_conversational_chain():
 
 #get answers
 def user_input(user_question):
-    docs = vector_store.similarity_search(user_question, k=12)
+    docs = vector_store.similarity_search(user_question, k=15)
     if not docs:
         return "Sorry, I couldn't find the answer.", None
     sources = []
@@ -186,26 +185,10 @@ def user_input(user_question):
     })
     
     answer_text = response if isinstance(response, str) else getattr(response, "content", str(response))
-    try:
-        qa_store_path = "qa_history_index"
-        qa_embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        qa_vector_store = FAISS.load_local(qa_store_path, qa_embedding, allow_dangerous_deserialization=True) if os.path.exists(f"{qa_store_path}/index.faiss") else None
- 
-        qa_text = f"Q: {user_question}\nA: {answer_text}"
-        qa_metadata = {"source": "chat_history"}
- 
-        if qa_vector_store:
-            qa_vector_store.add_texts([qa_text], metadatas=[qa_metadata])
-            qa_vector_store.save_local(qa_store_path)
-        else:
-            qa_vector_store = FAISS.from_texts([qa_text], embedding=qa_embedding, metadatas=[qa_metadata])
-            qa_vector_store.save_local(qa_store_path)
-    except Exception as e:
-        logging.error(f"Failed to save QA history to FAISS: {e}")
     return answer_text, sources
 
 # --- STREAMLIT UI ---
-st.title("UD Kaizen Helper 🚛")
+st.title("UD-Trucks BOT 🚛")
 
 if select_model == "Generate Gambar Produk":
     st.subheader("Ketik produk UD yang ingin dicari 🏎️")
@@ -218,12 +201,9 @@ if select_model == "Generate Gambar Produk":
             else:
                 st.error("No image found.")
 
-elif select_model == "UD Kaizen":
+elif select_model == "UD-Trucks BOT":
     if "messages" not in st.session_state:
-        st.session_state.messages = [{
-            "role": "assistant",
-            "content": "Hai! Saya **UD Kaizen Helper**, asisten cerdas untuk membantu Anda memahami seluruh produk dan spesifikasi dari *UD Trucks*. Tanyakan apa saja — saya siap bantu! 🚛"
-        }]
+        st.session_state.messages = [{"role": "assistant", "content": "Tanyakan apapun mengenai UD Trucks"}]
     #menyimpan referensi dokumen dari jawaban
     if "last_reference" not in st.session_state:
         st.session_state.last_reference = None
@@ -267,40 +247,13 @@ elif select_model == "UD Kaizen":
     
     if st.session_state.last_reference:
         st.markdown("Sources:")
-        st.markdown("""
-        <style>
-        .source-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 12px;
-            padding: 0;
-        }
-        .source-buttons .source-btn {
-            display: inline-block;
-            background-color: #1E40AF;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 14px;
-            text-align: center;
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        </style>
-        <div class="source-buttons">
-        """, unsafe_allow_html=True)
-
-        html_sources = ""
-        for i, (source, filepath) in enumerate(st.session_state.last_reference):
+        for source, filepath in st.session_state.last_reference:
             if filepath and os.path.exists(filepath):
                 with open(filepath, "rb") as f:
                     file_bytes = f.read()
-                b64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-                html_sources += f'''
-                <a href="data:application/pdf;base64,{b64_pdf}" download="{source}" class="source-btn">{source}</a>
-                '''
-        st.markdown(html_sources, unsafe_allow_html=True)
+                st.download_button(
+                    label=f"Download {source}",
+                    data=file_bytes,
+                    file_name=source,
+                    mime="application/pdf"
+                )

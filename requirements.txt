@@ -23,3 +23,5 @@ tiktoken
 # Utilities
 sentence-transformers
 google.generativeai
+PyPDF2
+langchain_google_genai
