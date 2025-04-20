@@ -45,6 +45,7 @@ if menu_option == "Chat":
     st.markdown("### Select Knowledge Base Model")
     selected_knowledge_base = st.selectbox("Knowledge Base:", ["Gemini", "OpenAI"])
     st.write("Welcome to the UD Kaizen Chatbot! Ask me anything.")
+    google_api_key = os.getenv("GOOGLE_GEMINI_API_KEY")  # Moved here
     
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -91,10 +92,9 @@ if menu_option == "Chat":
         openai_api_key = os.getenv("OPEN_AI_KEY")
 
         # Set up embedding model
-        if selected_model == "ChatGPT":
+        if selected_knowledge_base == "OpenAI":
             embedding_model = OpenAIEmbeddings(model="text-embedding-ada-002", openai_api_key=openai_api_key)
         else:
-            google_api_key = os.getenv("GOOGLE_API_KEY")
             embedding_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
 
         # Load FAISS indexes from knowledge_base
@@ -255,18 +255,21 @@ elif menu_option == "Base Knowledge":
         st.success("Files successfully embedded and saved.")
 
     # Show embedded file list
-    st.subheader("📂 Knowledge Base Files")
-    if os.path.exists(base_path):
-        for folder in os.listdir(base_path):
-            file_folder = os.path.join(base_path, folder)
-            if os.path.isdir(file_folder):
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.write(f"✅ {folder}")
-                with col2:
-                    if st.button(f"Delete {folder}", key=f"del_{folder}"):
-                        shutil.rmtree(file_folder)
-                        st.rerun()
+    st.subheader("📂 Knowledge Base Files (Grouped by Model)")
+    for model_name in ["openai", "gemini"]:
+        model_path = os.path.join("knowledge_base", model_name)
+        if os.path.exists(model_path):
+            st.markdown(f"### 📁 {model_name.upper()} Knowledge Base")
+            for folder in os.listdir(model_path):
+                file_folder = os.path.join(model_path, folder)
+                if os.path.isdir(file_folder):
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.write(f"✅ {folder}")
+                    with col2:
+                        if st.button(f"Delete {folder} from {model_name}", key=f"del_{model_name}_{folder}"):
+                            shutil.rmtree(file_folder)
+                            st.rerun()
 
 elif menu_option == "About":
     # ======================{About Feature}=====================
