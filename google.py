@@ -92,14 +92,14 @@ with st.sidebar:
     for i, doc in enumerate(documents, start=1):
         st.markdown(f"{i}. {doc['source']}")
     
-    st.markdown("### 🔍 Explore Vector Store")
-    all_docs = vector_store.similarity_search("a", k=100)
-    doc_titles = [f"{i+1}. {doc.metadata.get('source', 'Unknown')}" for i, doc in enumerate(all_docs)]
-    selected_doc = st.selectbox("Preview stored chunks:", doc_titles)
+    # st.markdown("### 🔍 Explore Vector Store")
+    # all_docs = vector_store.similarity_search("a", k=100)
+    # doc_titles = [f"{i+1}. {doc.metadata.get('source', 'Unknown')}" for i, doc in enumerate(all_docs)]
+    # selected_doc = st.selectbox("Preview stored chunks:", doc_titles)
 
     # Show the selected document's content
-    selected_index = doc_titles.index(selected_doc)
-    st.code(all_docs[selected_index].page_content[:1000])  # Show up to 1000 characters
+    # selected_index = doc_titles.index(selected_doc)
+    # st.code(all_docs[selected_index].page_content[:1000])  # Show up to 1000 characters
 
 # --- IMAGE SEARCH  ---
 def search_google_images(query):
