@@ -52,25 +52,6 @@ def get_documents():
     return documents
 
 
-#split to chunks
-def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
-    return splitter.split_text(text)
-
-#vector store 
-def create_vector_store(documents):
-    texts = []
-    metadatas = []
-    for doc in documents:
-        chunks = get_text_chunks(doc["text"])
-        texts.extend(chunks)
-        metadatas.extend([{"source": doc["source"], "filepath": doc["filepath"]}] * len(chunks))
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_texts(texts, embedding=embeddings, metadatas=metadatas)
-    vector_store.save_local(INDEX_PATH)
-    return vector_store
-
-
 @st.cache_resource
 def load_faiss_index():
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
@@ -123,6 +104,24 @@ def search_google_images(query):
         logging.error(f"Error fetching image: {e}")
         return None
 
+
+#split to chunks
+def get_text_chunks(text):
+    splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
+    return splitter.split_text(text)
+
+#vector store 
+def create_vector_store(documents):
+    texts = []
+    metadatas = []
+    for doc in documents:
+        chunks = get_text_chunks(doc["text"])
+        texts.extend(chunks)
+        metadatas.extend([{"source": doc["source"], "filepath": doc["filepath"]}] * len(chunks))
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vector_store = FAISS.from_texts(texts, embedding=embeddings, metadatas=metadatas)
+    vector_store.save_local(INDEX_PATH)
+    return vector_store
 
 # system prompt
 def get_conversational_chain():
