@@ -5,23 +5,26 @@ python-dotenv
 # LangChain & components
 langchain
 langchain-community
-faiss-cpu          # CPU version of FAISS (use faiss-gpu if needed)
+langchain-openai
+langchain_google_genai
 
-# Embeddings
+# FAISS
+faiss-cpu  # use faiss-gpu if you're on GPU
+
+# Embeddings & models
 openai
+google.generativeai
+
+# Tokenization
+tiktoken
 
 # PDF parsing
-pypdf               # for PDF support
-pdfminer.six        # required by some loaders
-
-# Optional (for HuggingFace LLM)
-huggingface-hub
-
-# Sentence splitting
-tiktoken
+pypdf
+PyPDF2
+pdfminer.six
 
 # Utilities
 sentence-transformers
-google.generativeai
-PyPDF2
-langchain_google_genai
+
+# Optional LLM support
+huggingface-hub
