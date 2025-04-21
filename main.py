@@ -267,7 +267,7 @@ elif menu_option == "Base Knowledge":
                     with col1:
                         st.write(f"✅ {folder}")
                     with col2:
-                        if st.button(f"Delete {folder} from {model_name}", key=f"del_{model_name}_{folder}"):
+                        if st.button(f"Delete", key=f"del_{model_name}_{folder}"):
                             shutil.rmtree(file_folder)
                             st.rerun()
 
