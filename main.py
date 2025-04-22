@@ -30,7 +30,7 @@ st.set_page_config(page_title="UD Kaizen")
 st.sidebar.title("Menu")
 selected_model = st.sidebar.selectbox(
     "LLM Model:",
-    ["Gemini", "4o-mini", "4o", "3.5-turbo", "3.5-turbo-16k", "3.5-turbo-32k"],
+    ["Gemini", "ChatGPT"],
     index=0,
     help="Select which Large Language Model to use for answering your questions."
 )
@@ -44,6 +44,7 @@ if menu_option == "Chat":
     st.title("UD Kaizen Chatbot")
     st.markdown("### Select Knowledge Base Model")
     selected_knowledge_base = st.selectbox("Knowledge Base:", ["Gemini", "OpenAI"])
+    use_knowledge_base = st.toggle("Use Knowledge Base (RAG)", value=True)
     st.write("Welcome to the UD Kaizen Chatbot! Ask me anything.")
     google_api_key = os.getenv("GOOGLE_GEMINI_API_KEY")  # Moved here
     
@@ -91,64 +92,98 @@ if menu_option == "Chat":
         # Load key from env
         openai_api_key = os.getenv("OPEN_AI_KEY")
 
-        # Set up embedding model
-        if selected_knowledge_base == "OpenAI":
-            embedding_model = OpenAIEmbeddings(model="text-embedding-ada-002", openai_api_key=openai_api_key)
-        else:
-            embedding_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
-
-        # Load FAISS indexes from knowledge_base
-        base_path = os.path.join("knowledge_base", selected_knowledge_base.lower())
-        retrievers = []
-        if os.path.exists(base_path):
-            for folder in os.listdir(base_path):
-                store_path = os.path.join(base_path, folder)
-                if os.path.isdir(store_path):
-                    try:
-                        vs = FAISS.load_local(store_path, embeddings=embedding_model, allow_dangerous_deserialization=True, index_name="index")
-                        retrievers.append(vs.as_retriever())
-                    except Exception as e:
-                        st.warning(f"Could not load vector store from {folder}: {e}")
-        if retrievers:
-            all_docs = []
-            for r in retrievers:
-                try:
-                    docs = r.vectorstore.similarity_search("a", k=5)
-                    all_docs.extend(docs)
-                except Exception as e:
-                    st.warning(f"Could not extract documents: {e}")
-
-            if all_docs:
-                combined_vs = FAISS.from_documents(all_docs, embedding_model)
-                retriever = combined_vs.as_retriever()
-            else:
-                st.error("⚠️ No documents could be retrieved from the knowledge base.")
-                st.stop()
-        else:
-            st.error("⚠️ No knowledge base found. Please upload files in the Base Knowledge section first.")
-            st.stop()
-
-        # Set up streaming LLM
         callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 
-        if selected_model == "ChatGPT":
-            llm = ChatOpenAI(
-                model="gpt-4o-mini",
-                temperature=0.7,
-                streaming=True,
-                openai_api_key=openai_api_key,
-                callback_manager=callback_manager
-            )
-        else:
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                temperature=0.7,
-                streaming=True,
-                google_api_key=google_api_key,
-                callback_manager=callback_manager
-            )
+        if not use_knowledge_base:
+            # General chat mode
+            if selected_model == "ChatGPT":
+                llm = ChatOpenAI(
+                    model="gpt-4o-mini",
+                    temperature=0.7,
+                    streaming=True,
+                    openai_api_key=openai_api_key,
+                    callback_manager=callback_manager
+                )
+            else:
+                llm = ChatGoogleGenerativeAI(
+                    model="gemini-2.0-flash",
+                    temperature=0.7,
+                    streaming=True,
+                    google_api_key=google_api_key,
+                    callback_manager=callback_manager
+                )
 
-        # Update prompt with context
+            with st.chat_message("bot", avatar="🤖"):
+                response_container = st.empty()
+                user_message = HumanMessage(content=prompt)
+                response = ""
+                for chunk in llm.stream([user_message]):
+                    if hasattr(chunk, "content"):
+                        response += chunk.content
+                        response_container.markdown(response + "▌")
+                response_container.markdown(response)
+                st.session_state.messages.append({"role": "bot", "content": response})
+                memory.chat_memory.add_user_message(prompt)
+                memory.chat_memory.add_ai_message(response)
+            st.stop()
+
+        if use_knowledge_base:
+            # Set up embedding model
+            if selected_knowledge_base == "OpenAI":
+                embedding_model = OpenAIEmbeddings(model="text-embedding-ada-002", openai_api_key=openai_api_key)
+            else:
+                embedding_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
+
+            # Load FAISS indexes from knowledge_base
+            base_path = os.path.join("knowledge_base", selected_knowledge_base.lower())
+            retrievers = []
+            if os.path.exists(base_path):
+                for folder in os.listdir(base_path):
+                    store_path = os.path.join(base_path, folder)
+                    if os.path.isdir(store_path):
+                        try:
+                            vs = FAISS.load_local(store_path, embeddings=embedding_model, allow_dangerous_deserialization=True, index_name="index")
+                            retrievers.append(vs.as_retriever())
+                        except Exception as e:
+                            st.warning(f"Could not load vector store from {folder}: {e}")
+            if retrievers:
+                all_docs = []
+                for r in retrievers:
+                    try:
+                        docs = r.vectorstore.similarity_search("a", k=5)
+                        all_docs.extend(docs)
+                    except Exception as e:
+                        st.warning(f"Could not extract documents: {e}")
+
+                if all_docs:
+                    combined_vs = FAISS.from_documents(all_docs, embedding_model)
+                    retriever = combined_vs.as_retriever()
+                else:
+                    st.error("⚠️ No documents could be retrieved from the knowledge base.")
+                    st.stop()
+            else:
+                st.error("⚠️ No knowledge base found. Please upload files in the Base Knowledge section first.")
+                st.stop()
+
+            # Set up streaming LLM
+            if selected_model == "ChatGPT":
+                llm = ChatOpenAI(
+                    model="gpt-4o-mini",
+                    temperature=0.7,
+                    streaming=True,
+                    openai_api_key=openai_api_key,
+                    callback_manager=callback_manager
+                )
+            else:
+                llm = ChatGoogleGenerativeAI(
+                    model="gemini-2.0-flash",
+                    temperature=0.7,
+                    streaming=True,
+                    google_api_key=google_api_key,
+                    callback_manager=callback_manager
+                )
+
+            # Update prompt with context
             system_prompt = """
             Anda adalah asisten cerdas bernama 'UD Kaizen Helper' yang ahli dalam menjawab pertanyaan terkait produk-produk UD Trucks.
             Gunakan informasi dari brosur yang telah diberikan untuk memberikan jawaban yang akurat dan terperinci.
@@ -170,41 +205,48 @@ if menu_option == "Chat":
             """
 
 
-        prompt_template = ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template(system_prompt),
-            HumanMessagePromptTemplate.from_template("Riwayat: {chat_history}\nPertanyaan: {question}")
-        ])
+            prompt_template = ChatPromptTemplate.from_messages([
+                SystemMessagePromptTemplate.from_template(system_prompt),
+                HumanMessagePromptTemplate.from_template("Riwayat: {chat_history}\nPertanyaan: {question}")
+            ])
 
-        chat_chain = ConversationalRetrievalChain.from_llm(
-            llm=llm,
-            retriever=retriever,
-            memory=memory,
-            combine_docs_chain_kwargs={"prompt": prompt_template},
-            return_source_documents=True,
-            output_key="answer"
-        )
-
-        # Stream and display bot response
-        with st.chat_message("bot", avatar="🤖"):
-            response_container = st.empty()
-            relevant_docs = retriever.get_relevant_documents(prompt)
-            context_text = "\n\n".join(doc.page_content for doc in relevant_docs)
-            formatted_prompt = prompt_template.format_messages(
-                chat_history=memory.chat_memory.messages,
-                question=prompt,
-                context=context_text
+            chat_chain = ConversationalRetrievalChain.from_llm(
+                llm=llm,
+                retriever=retriever,
+                memory=memory,
+                combine_docs_chain_kwargs={"prompt": prompt_template},
+                return_source_documents=True,
+                output_key="answer"
             )
 
-            response = ""
-            for chunk in llm.stream(formatted_prompt):
-                if hasattr(chunk, "content"):
-                    response += chunk.content
-                    response_container.markdown(response + "▌")
+            # Stream and display bot response
+            with st.chat_message("bot", avatar="🤖"):
+                response_container = st.empty()
+                relevant_docs = retriever.get_relevant_documents(prompt)
+                context_text = "\n\n".join(doc.page_content for doc in relevant_docs)
+                formatted_prompt = prompt_template.format_messages(
+                    chat_history=memory.chat_memory.messages,
+                    question=prompt,
+                    context=context_text
+                )
 
-            response_container.markdown(response)
-            st.session_state.messages.append({"role": "bot", "content": response})
-            memory.chat_memory.add_user_message(prompt)
-            memory.chat_memory.add_ai_message(response)
+                response = ""
+                for chunk in llm.stream(formatted_prompt):
+                    if hasattr(chunk, "content"):
+                        response += chunk.content
+                        response_container.markdown(response + "▌")
+
+                response_container.markdown(response)
+                # Show source files after the response
+                sources = list(set([doc.metadata.get("source", "Unknown") for doc in relevant_docs]))
+                if sources:
+                    with st.expander("📄 View Source Files"):
+                        for i, src in enumerate(sources, 1):
+                            file_url = f"/{selected_knowledge_base.lower()}/{src}"
+                            st.markdown(f"{i}. [📄 {src}]({file_url})", unsafe_allow_html=True)
+                st.session_state.messages.append({"role": "bot", "content": response})
+                memory.chat_memory.add_user_message(prompt)
+                memory.chat_memory.add_ai_message(response)
 
 elif menu_option == "Base Knowledge":
     from langchain.vectorstores import FAISS
