@@ -2,5 +2,6 @@ OPENAI_API_KEY=
 GOOGLE_GEMINI_API_KEY=
 GOOGLE_API_KEY=
 GOOGLE_CSE_ID=
+SERP_API_KEY=
 APP_TITLE="UD Kaizen Helper"
 APP_DESCRIPTION="Asisten cerdas untuk produk-produk UD Trucks"
